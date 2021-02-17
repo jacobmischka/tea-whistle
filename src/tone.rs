@@ -65,7 +65,7 @@ impl Tone {
         });
     }
 
-    pub fn stop(&self) {
+    pub fn stop(&mut self) {
         interrupt::free(|cs| {
             stop_tone(cs);
         });

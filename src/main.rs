@@ -7,6 +7,8 @@ use panic_halt as _;
 
 mod tone;
 
+use tone::Tone;
+
 #[arduino_uno::entry]
 fn main() -> ! {
     let dp = arduino_uno::Peripherals::take().unwrap();
@@ -18,12 +20,10 @@ fn main() -> ! {
 
     led.set_high().void_unwrap();
 
+    let mut tone = Tone::new(dp.TC0, pins.d2.into_output(&mut pins.ddr).downgrade());
+
     loop {
-        led.toggle().void_unwrap();
-        arduino_uno::delay_ms(200);
-        led.toggle().void_unwrap();
-        arduino_uno::delay_ms(200);
-        led.toggle().void_unwrap();
-        arduino_uno::delay_ms(200);
+        tone.play(261, 2000);
+        arduino_uno::delay_ms(4000);
     }
 }
