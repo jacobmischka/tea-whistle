@@ -1,8 +1,11 @@
 #![no_std]
 #![no_main]
+#![feature(abi_avr_interrupt)]
 
 use arduino_uno::prelude::*;
 use panic_halt as _;
+
+mod tone;
 
 #[arduino_uno::entry]
 fn main() -> ! {
