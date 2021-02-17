@@ -40,6 +40,7 @@ impl Tone {
         }
 
         interrupt::free(|cs| {
+            // initialize timer
             let timer_cell = TIMER.borrow(cs);
             let ref_mut = timer_cell.borrow_mut();
             RefMut::map(ref_mut, |opt| {
@@ -59,7 +60,7 @@ impl Tone {
                 opt
             });
 
-            // decrement counter
+            // set counter
             let counter_cell = TOGGLE_COUNTER.borrow(cs);
             counter_cell.set(2 * freq as u32 * duration / 1000);
         });
@@ -74,6 +75,7 @@ impl Tone {
     pub fn is_playing(&self) -> bool {
         let mut is_playing = false;
 
+        // check if interrupt is enabled
         interrupt::free(|cs| {
             let timer_cell = TIMER.borrow(cs);
             let ref_mut = timer_cell.borrow_mut();
@@ -120,6 +122,7 @@ fn TIMER0_COMPA() {
     interrupt::free(|cs| {
         let counter_cell = TOGGLE_COUNTER.borrow(cs);
         let counter = counter_cell.get();
+
         if counter == 0 {
             stop_tone(cs);
         } else {
@@ -134,8 +137,6 @@ fn TIMER0_COMPA() {
             });
 
             // decrement counter
-            let counter_cell = TOGGLE_COUNTER.borrow(cs);
-            let counter = counter_cell.get();
             counter_cell.set(counter - 1);
         }
     });
