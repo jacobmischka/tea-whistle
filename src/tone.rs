@@ -1,5 +1,5 @@
 use arduino_uno::{
-    hal::port::{mode, Pin},
+    hal::port::{mode, portb::PB5, Pin},
     pac::TC0,
     prelude::*,
 };
@@ -7,9 +7,10 @@ use avr_device::interrupt::{self, Mutex};
 
 use core::cell::{Cell, RefCell, RefMut};
 
-const CPU_FREQ: u32 = 16000;
+const CPU_FREQ: u32 = 16_000_000;
 const PRESCALERS: &[u16; 4] = &[1, 64, 256, 1024];
 
+static LED: Mutex<RefCell<Option<PB5<mode::Output>>>> = Mutex::new(RefCell::new(None));
 static TIMER: Mutex<RefCell<Option<TC0>>> = Mutex::new(RefCell::new(None));
 static TONE_PIN: Mutex<RefCell<Option<Pin<mode::Output>>>> = Mutex::new(RefCell::new(None));
 static TOGGLE_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
@@ -20,18 +21,25 @@ pub struct Tone {}
 impl Tone {
     pub fn new(tc0: TC0, pin: Pin<mode::Output>) -> Self {
         interrupt::free(|cs| {
-            let timer_cell = TIMER.borrow(cs);
-            timer_cell.replace(Some(tc0));
-
-            let pin_cell = TONE_PIN.borrow(cs);
-            pin_cell.replace(Some(pin));
+            TIMER.borrow(cs).replace(Some(tc0));
+            TONE_PIN.borrow(cs).replace(Some(pin));
         });
 
         Tone {}
     }
 
+    pub fn sync_led(&mut self, led: PB5<mode::Output>) {
+        interrupt::free(|cs| {
+            LED.borrow(cs).replace(Some(led));
+        });
+    }
+
     /// frequency in hz, duration in ms
     pub fn play(&mut self, freq: u16, duration: u32) {
+        if self.is_playing() {
+            return;
+        }
+
         let mut prescaler_index = 0;
         let mut ocr = get_ocr(freq, PRESCALERS[prescaler_index]);
         while ocr > 255 {
@@ -41,9 +49,8 @@ impl Tone {
 
         interrupt::free(|cs| {
             // initialize timer
-            let timer_cell = TIMER.borrow(cs);
-            let ref_mut = timer_cell.borrow_mut();
-            RefMut::map(ref_mut, |opt| {
+            let timer = TIMER.borrow(cs).borrow_mut();
+            RefMut::map(timer, |opt| {
                 if let Some(tc0) = opt {
                     tc0.tccr0a.write(|w| w.wgm0().ctc());
                     tc0.ocr0a.write(|w| unsafe { w.bits(ocr as u8) });
@@ -61,8 +68,12 @@ impl Tone {
             });
 
             // set counter
-            let counter_cell = TOGGLE_COUNTER.borrow(cs);
-            counter_cell.set(2 * freq as u32 * duration / 1000);
+            TOGGLE_COUNTER
+                .borrow(cs)
+                .set(2 * freq as u32 * duration / 1000);
+
+            // set led
+            set_led(cs, true);
         });
     }
 
@@ -77,9 +88,8 @@ impl Tone {
 
         // check if interrupt is enabled
         interrupt::free(|cs| {
-            let timer_cell = TIMER.borrow(cs);
-            let ref_mut = timer_cell.borrow_mut();
-            RefMut::map(ref_mut, |opt| {
+            let timer = TIMER.borrow(cs).borrow_mut();
+            RefMut::map(timer, |opt| {
                 if let Some(tc0) = opt {
                     is_playing = tc0.timsk0.read().ocie0a().bit_is_set();
                 }
@@ -94,14 +104,9 @@ impl Tone {
 impl Drop for Tone {
     fn drop(&mut self) {
         interrupt::free(|cs| {
-            let timer_cell = TIMER.borrow(cs);
-            timer_cell.replace(None);
-
-            let pin_cell = TONE_PIN.borrow(cs);
-            pin_cell.replace(None);
-
-            let toggle_cell = TOGGLE_COUNTER.borrow(cs);
-            toggle_cell.replace(0);
+            TIMER.borrow(cs).replace(None);
+            TONE_PIN.borrow(cs).replace(None);
+            TOGGLE_COUNTER.borrow(cs).replace(0);
         });
     }
 }
@@ -112,9 +117,8 @@ fn get_ocr(freq: u16, prescaler: u16) -> u32 {
 
 fn stop_tone(cs: &interrupt::CriticalSection) {
     // disable interrupt
-    let timer_cell = TIMER.borrow(cs);
-    let ref_mut = timer_cell.borrow_mut();
-    RefMut::map(ref_mut, |opt| {
+    let timer = TIMER.borrow(cs).borrow_mut();
+    RefMut::map(timer, |opt| {
         if let Some(tc0) = opt {
             tc0.timsk0.write(|w| w.ocie0a().clear_bit());
         }
@@ -122,14 +126,25 @@ fn stop_tone(cs: &interrupt::CriticalSection) {
     });
 
     // set pin low
-    let pin_cell = TONE_PIN.borrow(cs);
-    let ref_mut = pin_cell.borrow_mut();
-    RefMut::map(ref_mut, |opt| {
+    let pin = TONE_PIN.borrow(cs).borrow_mut();
+    RefMut::map(pin, |opt| {
         if let Some(pin) = opt {
-            pin.set_high().void_unwrap();
+            pin.set_low().void_unwrap();
         }
         opt
     });
+
+    set_led(cs, false);
+}
+
+fn set_led(cs: &interrupt::CriticalSection, lit: bool) -> Option<()> {
+    LED.borrow(cs).borrow_mut().as_mut().map(|led| {
+        if lit {
+            led.set_high().void_unwrap();
+        } else {
+            led.set_low().void_unwrap();
+        }
+    })
 }
 
 #[avr_device::interrupt(atmega328p)]
@@ -142,9 +157,8 @@ fn TIMER0_COMPA() {
             stop_tone(cs);
         } else {
             // toggle pin
-            let pin_cell = TONE_PIN.borrow(cs);
-            let ref_mut = pin_cell.borrow_mut();
-            RefMut::map(ref_mut, |opt| {
+            let pin = TONE_PIN.borrow(cs).borrow_mut();
+            RefMut::map(pin, |opt| {
                 if let Some(pin) = opt {
                     pin.toggle().void_unwrap();
                 }
