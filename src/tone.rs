@@ -91,6 +91,21 @@ impl Tone {
     }
 }
 
+impl Drop for Tone {
+    fn drop(&mut self) {
+        interrupt::free(|cs| {
+            let timer_cell = TIMER.borrow(cs);
+            timer_cell.replace(None);
+
+            let pin_cell = TONE_PIN.borrow(cs);
+            pin_cell.replace(None);
+
+            let toggle_cell = TOGGLE_COUNTER.borrow(cs);
+            toggle_cell.replace(0);
+        });
+    }
+}
+
 fn get_ocr(freq: u16, prescaler: u16) -> u32 {
     CPU_FREQ / freq as u32 / 2 / prescaler as u32 - 1
 }
