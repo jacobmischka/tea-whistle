@@ -2,14 +2,17 @@
 #![no_main]
 #![feature(abi_avr_interrupt)]
 
-use arduino_uno::prelude::*;
+use arduino_uno::{prelude::*, Delay};
 use avr_device::interrupt;
 use panic_halt as _;
 
 mod temp;
 mod tone;
 
+use temp::Temp;
 use tone::Tone;
+
+const BOILING_POINT_C: f32 = 100.0;
 
 #[arduino_uno::entry]
 fn main() -> ! {
@@ -17,19 +20,38 @@ fn main() -> ! {
 
     let mut pins = arduino_uno::Pins::new(dp.PORTB, dp.PORTC, dp.PORTD);
 
-    // Digital pin 13 is also connected to an onboard LED marked "L"
     let mut led = pins.d13.into_output(&mut pins.ddr);
     led.set_low().void_unwrap();
 
     let mut tone = Tone::new(dp.TC0, pins.d2.into_output(&mut pins.ddr).downgrade());
     tone.sync_led(led);
 
+    let mut delay = Delay::new();
+    let mut temp = Temp::new(pins.d8.into_tri_state(&mut pins.ddr), &mut delay)
+        .unwrap()
+        .unwrap();
+
     unsafe {
         interrupt::enable();
     }
 
+    let mut hot = false;
     loop {
-        tone.play(261, 2000);
-        arduino_uno::delay_ms(4000);
+        if let Ok(c) = temp.read_c(&mut delay) {
+            if c >= BOILING_POINT_C {
+                hot = true;
+            } else {
+                hot = false;
+            }
+        }
+
+        if hot {
+            play_alarm(&mut tone);
+        }
     }
+}
+
+fn play_alarm(tone: &mut Tone) {
+    tone.play(261, 2000);
+    arduino_uno::delay_ms(3000);
 }

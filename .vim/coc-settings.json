@@ -1,0 +1,4 @@
+{
+	"rust-analyzer.cargo.target": "avr-atmega328p.json",
+	"rust-analyzer.checkOnSave.allTargets": false
+}

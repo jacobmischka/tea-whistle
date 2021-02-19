@@ -18,6 +18,7 @@ static TOGGLE_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 #[non_exhaustive]
 pub struct Tone {}
 
+#[allow(dead_code)]
 impl Tone {
     pub fn new(tc0: TC0, pin: Pin<mode::Output>) -> Self {
         interrupt::free(|cs| {
