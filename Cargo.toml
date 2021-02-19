@@ -12,6 +12,8 @@ nb = "0.1.2"
 ufmt = "0.1.0"
 embedded-hal = "0.2.4"
 avr-device = { version = "0.3.0", features = ["atmega328p"] }
+one-wire-bus = "0.1.1"
+ds18b20 = "0.1.1"
 
 [dependencies.arduino-uno]
 git = "https://github.com/Rahix/avr-hal"

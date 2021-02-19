@@ -6,6 +6,7 @@ use arduino_uno::prelude::*;
 use avr_device::interrupt;
 use panic_halt as _;
 
+mod temp;
 mod tone;
 
 use tone::Tone;
