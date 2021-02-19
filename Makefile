@@ -1,9 +1,12 @@
-.PHONY=list flash
+.PHONY=list flash serial
 
 list:
-	@echo flash
+	@echo flash, serial
 
-flash: target/avr-atmega328p/debug/tea-whistle.elf
-	cargo build
-	./uno-runner.sh $<
+flash:
+	cargo build --release
+	./uno-runner.sh target/avr-atmega328p/release/tea-whistle.elf
+
+serial: /dev/ttyUSB0
+	screen $< 57600
 
