@@ -1,3 +1,4 @@
+use arduino_uno::{hal::port::mode::Floating, prelude::*, Serial};
 use ds18b20::Ds18b20;
 use embedded_hal::{
     blocking::delay::DelayUs,
@@ -12,10 +13,20 @@ pub struct Temp<P> {
 
 #[allow(dead_code)]
 impl<E, P: OutputPin<Error = E> + InputPin<Error = E>> Temp<P> {
-    pub fn new(p: P, delay: &mut impl DelayUs<u16>) -> OneWireResult<Option<Self>, E> {
+    pub fn new(
+        p: P,
+        delay: &mut impl DelayUs<u16>,
+        mut serial: Option<&mut Serial<Floating>>,
+    ) -> OneWireResult<Option<Self>, E> {
         let mut one_wire_bus = OneWire::new(p)?;
+
         for device_address in one_wire_bus.devices(false, delay) {
             if let Ok(device_address) = device_address {
+                if let Some(ref mut serial) = serial {
+                    ufmt::uwriteln!(serial, "Device address: {}\r", device_address.family_code())
+                        .void_unwrap();
+                }
+
                 if device_address.family_code() == ds18b20::FAMILY_CODE {
                     let sensor = Ds18b20::new(device_address)?;
 
@@ -23,6 +34,10 @@ impl<E, P: OutputPin<Error = E> + InputPin<Error = E>> Temp<P> {
                         one_wire_bus,
                         sensor,
                     }));
+                }
+            } else {
+                if let Some(ref mut serial) = serial {
+                    ufmt::uwriteln!(serial, "Device error!\r").void_unwrap();
                 }
             }
         }

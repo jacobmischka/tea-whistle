@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(abi_avr_interrupt)]
 
-use arduino_uno::{prelude::*, Delay};
+use arduino_uno::{delay_ms, prelude::*, Delay, Serial};
 use avr_device::interrupt;
 use panic_halt as _;
 
@@ -25,15 +25,38 @@ fn main() -> ! {
 
     let mut tone = Tone::new(dp.TC0, pins.d2.into_output(&mut pins.ddr).downgrade());
     tone.sync_led(led);
+    let mut serial = Serial::new(
+        dp.USART0,
+        pins.d0,
+        pins.d1.into_output(&mut pins.ddr),
+        57600.into_baudrate(),
+    );
+
+    ufmt::uwriteln!(&mut serial, "Hello from Arduino!\r").void_unwrap();
 
     let mut delay = Delay::new();
-    let mut temp = Temp::new(pins.d8.into_tri_state(&mut pins.ddr), &mut delay)
-        .unwrap()
-        .unwrap();
+    let mut temp = match Temp::new(
+        pins.d8.into_tri_state(&mut pins.ddr),
+        &mut delay,
+        Some(&mut serial),
+    ) {
+        Ok(Some(temp)) => temp,
+        Ok(None) => {
+            ufmt::uwriteln!(&mut serial, "no thermometer\r").void_unwrap();
+            panic!()
+        }
+        Err(_) => {
+            ufmt::uwriteln!(&mut serial, "error\r").void_unwrap();
+            panic!()
+        }
+    };
 
     unsafe {
         interrupt::enable();
     }
+
+    tone.play(261, 500);
+    delay_ms(1000);
 
     let mut hot = false;
     loop {
@@ -53,5 +76,5 @@ fn main() -> ! {
 
 fn play_alarm(tone: &mut Tone) {
     tone.play(261, 2000);
-    arduino_uno::delay_ms(3000);
+    delay_ms(3000);
 }
