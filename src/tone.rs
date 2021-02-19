@@ -105,6 +105,7 @@ impl Tone {
 impl Drop for Tone {
     fn drop(&mut self) {
         interrupt::free(|cs| {
+            LED.borrow(cs).replace(None);
             TIMER.borrow(cs).replace(None);
             TONE_PIN.borrow(cs).replace(None);
             TOGGLE_COUNTER.borrow(cs).replace(0);
