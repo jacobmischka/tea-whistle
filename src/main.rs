@@ -4,6 +4,7 @@
 
 use arduino_uno::{delay_ms, prelude::*, Delay, Serial};
 use avr_device::interrupt;
+use one_wire_bus::OneWireError;
 use panic_halt as _;
 
 mod temp;
@@ -35,18 +36,33 @@ fn main() -> ! {
     ufmt::uwriteln!(&mut serial, "Hello from Arduino!\r").void_unwrap();
 
     let mut delay = Delay::new();
-    let mut temp = match Temp::new(
-        pins.d8.into_tri_state(&mut pins.ddr),
-        &mut delay,
-        Some(&mut serial),
-    ) {
+    let mut temp = match Temp::new(pins.d10.into_tri_state(&mut pins.ddr), &mut delay) {
         Ok(Some(temp)) => temp,
         Ok(None) => {
-            ufmt::uwriteln!(&mut serial, "no thermometer\r").void_unwrap();
+            ufmt::uwriteln!(&mut serial, "No thermometer\r").void_unwrap();
             panic!()
         }
-        Err(_) => {
-            ufmt::uwriteln!(&mut serial, "error\r").void_unwrap();
+        Err(err) => {
+            match err {
+                OneWireError::BusNotHigh => {
+                    ufmt::uwriteln!(&mut serial, "Bus not high\r").void_unwrap();
+                }
+                OneWireError::PinError(_) => {
+                    ufmt::uwriteln!(&mut serial, "Pin error\r").void_unwrap();
+                }
+                OneWireError::UnexpectedResponse => {
+                    ufmt::uwriteln!(&mut serial, "UnexpectedResponse\r").void_unwrap();
+                }
+                OneWireError::FamilyCodeMismatch => {
+                    ufmt::uwriteln!(&mut serial, "Family code mismatch\r").void_unwrap();
+                }
+                OneWireError::CrcMismatch => {
+                    ufmt::uwriteln!(&mut serial, "CRC mismatch\r").void_unwrap();
+                }
+                OneWireError::Timeout => {
+                    ufmt::uwriteln!(&mut serial, "Timeout\r").void_unwrap();
+                }
+            }
             panic!()
         }
     };
