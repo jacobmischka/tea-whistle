@@ -53,7 +53,8 @@ fn main() -> ! {
         interrupt::enable();
     }
 
-    play_alarm(&mut tone);
+    tone.play(1200, 200);
+    delay_ms(250);
 
     let mut hot = false;
     loop {

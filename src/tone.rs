@@ -5,7 +5,7 @@ use arduino_uno::{
 };
 use avr_device::interrupt::{self, Mutex};
 
-use core::cell::{Cell, RefCell, RefMut};
+use core::cell::{Cell, RefCell};
 
 const CPU_FREQ: u32 = 16_000_000;
 const PRESCALERS: &[u16; 4] = &[1, 64, 256, 1024];
@@ -50,23 +50,20 @@ impl Tone {
 
         interrupt::free(|cs| {
             // initialize timer
-            let timer = TIMER.borrow(cs).borrow_mut();
-            RefMut::map(timer, |opt| {
-                if let Some(tc0) = opt {
-                    tc0.tccr0a.write(|w| w.wgm0().ctc());
-                    tc0.ocr0a.write(|w| unsafe { w.bits(ocr as u8) });
-                    tc0.tccr0b.write(|w| match PRESCALERS[prescaler_index] {
-                        1 => w.cs0().direct(),
-                        8 => w.cs0().prescale_8(),
-                        64 => w.cs0().prescale_64(),
-                        256 => w.cs0().prescale_256(),
-                        1024 => w.cs0().prescale_1024(),
-                        _ => panic!(),
-                    });
-                    tc0.timsk0.write(|w| w.ocie0a().set_bit());
-                }
-                opt
-            });
+            let mut timer = TIMER.borrow(cs).borrow_mut();
+            if let Some(tc0) = timer.as_mut() {
+                tc0.tccr0a.write(|w| w.wgm0().ctc());
+                tc0.ocr0a.write(|w| unsafe { w.bits(ocr as u8) });
+                tc0.tccr0b.write(|w| match PRESCALERS[prescaler_index] {
+                    1 => w.cs0().direct(),
+                    8 => w.cs0().prescale_8(),
+                    64 => w.cs0().prescale_64(),
+                    256 => w.cs0().prescale_256(),
+                    1024 => w.cs0().prescale_1024(),
+                    _ => panic!(),
+                });
+                tc0.timsk0.write(|w| w.ocie0a().set_bit());
+            }
 
             // set counter
             TOGGLE_COUNTER
@@ -89,13 +86,10 @@ impl Tone {
 
         // check if interrupt is enabled
         interrupt::free(|cs| {
-            let timer = TIMER.borrow(cs).borrow_mut();
-            RefMut::map(timer, |opt| {
-                if let Some(tc0) = opt {
-                    is_playing = tc0.timsk0.read().ocie0a().bit_is_set();
-                }
-                opt
-            });
+            let mut timer = TIMER.borrow(cs).borrow_mut();
+            if let Some(tc0) = timer.as_mut() {
+                is_playing = tc0.timsk0.read().ocie0a().bit_is_set();
+            }
         });
 
         is_playing
@@ -119,22 +113,16 @@ fn get_ocr(freq: u16, prescaler: u16) -> u32 {
 
 fn stop_tone(cs: &interrupt::CriticalSection) {
     // disable interrupt
-    let timer = TIMER.borrow(cs).borrow_mut();
-    RefMut::map(timer, |opt| {
-        if let Some(tc0) = opt {
-            tc0.timsk0.write(|w| w.ocie0a().clear_bit());
-        }
-        opt
-    });
+    let mut timer = TIMER.borrow(cs).borrow_mut();
+    if let Some(tc0) = timer.as_mut() {
+        tc0.timsk0.write(|w| w.ocie0a().clear_bit());
+    }
 
     // set pin low
-    let pin = TONE_PIN.borrow(cs).borrow_mut();
-    RefMut::map(pin, |opt| {
-        if let Some(pin) = opt {
-            pin.set_low().void_unwrap();
-        }
-        opt
-    });
+    let mut pin = TONE_PIN.borrow(cs).borrow_mut();
+    if let Some(pin) = pin.as_mut() {
+        pin.set_low().void_unwrap();
+    }
 
     set_led(cs, false);
 }
@@ -159,13 +147,10 @@ fn TIMER0_COMPA() {
             stop_tone(cs);
         } else {
             // toggle pin
-            let pin = TONE_PIN.borrow(cs).borrow_mut();
-            RefMut::map(pin, |opt| {
-                if let Some(pin) = opt {
-                    pin.toggle().void_unwrap();
-                }
-                opt
-            });
+            let mut pin = TONE_PIN.borrow(cs).borrow_mut();
+            if let Some(pin) = pin.as_mut() {
+                pin.toggle().void_unwrap();
+            }
 
             // decrement counter
             counter_cell.set(counter - 1);
