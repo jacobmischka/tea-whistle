@@ -102,6 +102,8 @@ impl<E> uDebug for OneWireErrorWrapper<E> {
 }
 
 fn play_alarm(tone: &mut Tone) {
-    tone.play(500, 1000);
-    delay_ms(2000);
+    for _ in 0..4 {
+        tone.play(1200, 200);
+        delay_ms(250);
+    }
 }
