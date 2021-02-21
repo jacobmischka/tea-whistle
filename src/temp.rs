@@ -1,3 +1,4 @@
+use arduino_uno::{hal::port::mode::Floating, Serial};
 use avr_device::interrupt;
 use ds18b20::{Ds18b20, Resolution, SensorData};
 use embedded_hal::{

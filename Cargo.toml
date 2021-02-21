@@ -19,6 +19,9 @@ ds18b20 = "0.1.1"
 git = "https://github.com/Rahix/avr-hal"
 features = [ "arduino-nano" ]
 
+[patch.crates-io]
+one-wire-bus = { git = "https://github.com/jacobmischka/one-wire-bus.git", branch = "mul-not-shl" }
+
 [profile.dev]
 panic = "abort"
 lto = true

@@ -108,8 +108,7 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 [[package]]
 name = "one-wire-bus"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9761e13074f8f916702c1a1dbe0eda3fb8478704db00493f5a5c27ed5847710"
+source = "git+https://github.com/jacobmischka/one-wire-bus.git?branch=mul-not-shl#4aa377737af20f714fb7d03cbd95e3363a160c9a"
 dependencies = [
  "embedded-hal",
 ]

@@ -6,6 +6,7 @@ use arduino_uno::{delay_ms, prelude::*, Delay, Serial};
 use avr_device::interrupt;
 use one_wire_bus::OneWireError;
 use panic_halt as _;
+use ufmt::{uDebug, uWrite};
 
 mod temp;
 mod tone;
@@ -36,33 +37,14 @@ fn main() -> ! {
     ufmt::uwriteln!(&mut serial, "Hello from Arduino!\r").void_unwrap();
 
     let mut delay = Delay::new();
-    let mut temp = match Temp::new(pins.d10.into_tri_state(&mut pins.ddr), &mut delay) {
+    let mut temp = match Temp::new(pins.d11.into_tri_state(&mut pins.ddr), &mut delay) {
         Ok(Some(temp)) => temp,
         Ok(None) => {
             ufmt::uwriteln!(&mut serial, "No thermometer\r").void_unwrap();
             panic!()
         }
         Err(err) => {
-            match err {
-                OneWireError::BusNotHigh => {
-                    ufmt::uwriteln!(&mut serial, "Bus not high\r").void_unwrap();
-                }
-                OneWireError::PinError(_) => {
-                    ufmt::uwriteln!(&mut serial, "Pin error\r").void_unwrap();
-                }
-                OneWireError::UnexpectedResponse => {
-                    ufmt::uwriteln!(&mut serial, "UnexpectedResponse\r").void_unwrap();
-                }
-                OneWireError::FamilyCodeMismatch => {
-                    ufmt::uwriteln!(&mut serial, "Family code mismatch\r").void_unwrap();
-                }
-                OneWireError::CrcMismatch => {
-                    ufmt::uwriteln!(&mut serial, "CRC mismatch\r").void_unwrap();
-                }
-                OneWireError::Timeout => {
-                    ufmt::uwriteln!(&mut serial, "Timeout\r").void_unwrap();
-                }
-            }
+            ufmt::uwriteln!(&mut serial, "{:?}", OneWireErrorWrapper(err)).void_unwrap();
             panic!()
         }
     };
@@ -71,8 +53,7 @@ fn main() -> ! {
         interrupt::enable();
     }
 
-    tone.play(261, 500);
-    delay_ms(1000);
+    play_alarm(&mut tone);
 
     let mut hot = false;
     loop {
@@ -90,7 +71,37 @@ fn main() -> ! {
     }
 }
 
+struct OneWireErrorWrapper<E>(OneWireError<E>);
+
+impl<E> uDebug for OneWireErrorWrapper<E> {
+    fn fmt<W>(&self, f: &mut ufmt::Formatter<'_, W>) -> Result<(), W::Error>
+    where
+        W: uWrite + ?Sized,
+    {
+        match self.0 {
+            OneWireError::BusNotHigh => {
+                ufmt::uwrite!(f, "Bus not high")
+            }
+            OneWireError::PinError(_) => {
+                ufmt::uwrite!(f, "Pin error")
+            }
+            OneWireError::UnexpectedResponse => {
+                ufmt::uwrite!(f, "Unexpected response")
+            }
+            OneWireError::FamilyCodeMismatch => {
+                ufmt::uwrite!(f, "Family code mismatch")
+            }
+            OneWireError::CrcMismatch => {
+                ufmt::uwrite!(f, "CRC mismatch")
+            }
+            OneWireError::Timeout => {
+                ufmt::uwrite!(f, "Timeout")
+            }
+        }
+    }
+}
+
 fn play_alarm(tone: &mut Tone) {
-    tone.play(261, 2000);
-    delay_ms(3000);
+    tone.play(500, 1000);
+    delay_ms(2000);
 }
