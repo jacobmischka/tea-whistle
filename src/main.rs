@@ -2,11 +2,9 @@
 #![no_main]
 #![feature(abi_avr_interrupt)]
 
-use arduino_uno::{delay_ms, prelude::*, Delay, Serial};
+use arduino_uno::{delay_ms, prelude::*, Delay};
 use avr_device::interrupt;
-use one_wire_bus::OneWireError;
 use panic_halt as _;
-use ufmt::{uDebug, uWrite};
 
 mod temp;
 mod tone;
@@ -27,27 +25,11 @@ fn main() -> ! {
 
     let mut tone = Tone::new(dp.TC0, pins.d2.into_output(&mut pins.ddr).downgrade());
     tone.sync_led(led);
-    let mut serial = Serial::new(
-        dp.USART0,
-        pins.d0,
-        pins.d1.into_output(&mut pins.ddr),
-        57600.into_baudrate(),
-    );
-
-    ufmt::uwriteln!(&mut serial, "Hello from Arduino!\r").void_unwrap();
 
     let mut delay = Delay::new();
-    let mut temp = match Temp::new(pins.d11.into_tri_state(&mut pins.ddr), &mut delay) {
-        Ok(Some(temp)) => temp,
-        Ok(None) => {
-            ufmt::uwriteln!(&mut serial, "No thermometer\r").void_unwrap();
-            panic!()
-        }
-        Err(err) => {
-            ufmt::uwriteln!(&mut serial, "{:?}", OneWireErrorWrapper(err)).void_unwrap();
-            panic!()
-        }
-    };
+    let mut temp = Temp::new(pins.d11.into_tri_state(&mut pins.ddr), &mut delay)
+        .unwrap()
+        .unwrap();
 
     unsafe {
         interrupt::enable();
@@ -68,36 +50,6 @@ fn main() -> ! {
 
         if hot {
             play_alarm(&mut tone);
-        }
-    }
-}
-
-struct OneWireErrorWrapper<E>(OneWireError<E>);
-
-impl<E> uDebug for OneWireErrorWrapper<E> {
-    fn fmt<W>(&self, f: &mut ufmt::Formatter<'_, W>) -> Result<(), W::Error>
-    where
-        W: uWrite + ?Sized,
-    {
-        match self.0 {
-            OneWireError::BusNotHigh => {
-                ufmt::uwrite!(f, "Bus not high")
-            }
-            OneWireError::PinError(_) => {
-                ufmt::uwrite!(f, "Pin error")
-            }
-            OneWireError::UnexpectedResponse => {
-                ufmt::uwrite!(f, "Unexpected response")
-            }
-            OneWireError::FamilyCodeMismatch => {
-                ufmt::uwrite!(f, "Family code mismatch")
-            }
-            OneWireError::CrcMismatch => {
-                ufmt::uwrite!(f, "CRC mismatch")
-            }
-            OneWireError::Timeout => {
-                ufmt::uwrite!(f, "Timeout")
-            }
         }
     }
 }
