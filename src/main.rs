@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(abi_avr_interrupt)]
 
-use arduino_uno::{delay_ms, prelude::*, Delay};
+use arduino_uno::{delay_ms, Delay};
 use avr_device::interrupt;
 use panic_halt as _;
 
@@ -20,14 +20,10 @@ fn main() -> ! {
 
     let mut pins = arduino_uno::Pins::new(dp.PORTB, dp.PORTC, dp.PORTD);
 
-    let mut led = pins.d13.into_output(&mut pins.ddr);
-    led.set_low().void_unwrap();
-
     let mut tone = Tone::new(dp.TC0, pins.d2.into_output(&mut pins.ddr).downgrade());
-    tone.sync_led(led);
 
     let mut delay = Delay::new();
-    let mut temp = Temp::new(pins.d11.into_tri_state(&mut pins.ddr), &mut delay)
+    let mut temp = Temp::new(pins.d3.into_tri_state(&mut pins.ddr), &mut delay)
         .unwrap()
         .unwrap();
 
