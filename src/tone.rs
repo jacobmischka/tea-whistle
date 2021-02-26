@@ -8,7 +8,7 @@ use avr_device::interrupt::{self, Mutex};
 use core::cell::{Cell, RefCell};
 
 const CPU_FREQ: u32 = 16_000_000;
-const PRESCALERS: &[u16; 4] = &[1, 64, 256, 1024];
+const PRESCALERS: &[u16; 5] = &[1, 8, 64, 256, 1024];
 
 static LED: Mutex<RefCell<Option<PB5<mode::Output>>>> = Mutex::new(RefCell::new(None));
 static TIMER: Mutex<RefCell<Option<TC0>>> = Mutex::new(RefCell::new(None));
